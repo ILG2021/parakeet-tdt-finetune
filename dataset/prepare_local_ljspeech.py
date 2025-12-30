@@ -34,7 +34,7 @@ def create_manifest_ljspeech(metadata_path, wav_dir, manifest_path, lang):
         transcript = parts[1]
         
         # Construct audio path. LJSpeech files are usually .wav
-        audio_path = os.path.join(wav_dir, f"{file_id}.wav")
+        audio_path = os.path.join(wav_dir, f"{file_id}")
         
         if not os.path.exists(audio_path):
             # Try without .wav if ID already contains it, or check for common variants
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate NeMo manifest from LJSpeech folder")
     parser.add_argument("--data_folder", type=str, required=True, help="Root directory of LJSpeech dataset")
     parser.add_argument("--output_manifest", type=str, required=True, help="Path to save the manifest.json")
-    parser.add_argument("--lang", type=str, default="en", help="Language code")
+    parser.add_argument("--lang", type=str, default="zh", help="Language code")
     
     args = parser.parse_args()
 
