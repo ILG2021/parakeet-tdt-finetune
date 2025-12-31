@@ -22,6 +22,34 @@ def extract_char_list(manifest_paths):
     print(f"Total unique characters found: {len(char_list)}")
     return char_list
 
+def train_char_tokenizer(manifest_paths, output_dir):
+    """Trains a character-level SentencePiece tokenizer on the fly."""
+    import sentencepiece as spm
+    print(f"Training character-level tokenizer in {output_dir}...")
+    os.makedirs(output_dir, exist_ok=True)
+    text_path = os.path.join(output_dir, 'corpus.txt')
+    
+    # Collect all text for training
+    chars = set()
+    with open(text_path, 'w', encoding='utf-8') as f_out:
+        for m in manifest_paths.split(','):
+            with open(m.strip(), 'r', encoding='utf-8') as f_in:
+                for line in f_in:
+                    text = json.loads(line)['text']
+                    f_out.write(text + '\n')
+                    chars.update(list(text))
+    
+    vocab_size = len(chars) + 32  # Add buffer for control tokens (<unk>, <s>, </s>, etc.)
+    
+    spm.SentencePieceTrainer.train(
+        input=text_path,
+        model_prefix=os.path.join(output_dir, 'tokenizer'),
+        vocab_size=vocab_size,
+        model_type='char',
+        character_coverage=1.0,
+    )
+    print(f"Tokenizer training complete. Vocab size: {vocab_size}")
+
 def main(args):
     # 1. Load the pre-trained Parakeet-TDT-0.6b-v3 model
     print("Loading pre-trained model: nvidia/parakeet-tdt-0.6b-v3")
@@ -34,10 +62,12 @@ def main(args):
         print(f"Using provided tokenizer from {args.tokenizer_path}")
         model.change_vocabulary(new_tokenizer_dir=args.tokenizer_path, new_tokenizer_type="bpe")
     else:
-        print("No tokenizer provided. Generating Character-based vocabulary from manifests...")
-        char_list = extract_char_list(args.train_manifest)
-        # NeMo's change_vocabulary for Character-based models takes a list of tokens
-        model.change_vocabulary(new_vocabulary=char_list)
+        print("No tokenizer provided. Generating character-level SP tokenizer from manifests...")
+        # For EncDecRNNTBPEModel, we must provide a tokenizer directory. 
+        # We train a quick character-level SentencePiece model to act as a char-tokenizer.
+        temp_tokenizer_dir = "chinese_tokenizer_chars"
+        train_char_tokenizer(args.train_manifest, temp_tokenizer_dir)
+        model.change_vocabulary(new_tokenizer_dir=temp_tokenizer_dir, new_tokenizer_type="bpe")
     
     # 3. Setup training data
     # NeMo supports comma-separated manifest files
