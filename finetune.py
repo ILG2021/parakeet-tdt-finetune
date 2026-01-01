@@ -75,8 +75,10 @@ def main(args):
         model.change_vocabulary(new_tokenizer_dir=temp_tokenizer_dir, new_tokenizer_type="bpe")
     
     # 3. Setup training data
-    # NeMo supports comma-separated manifest files
-    print(f"Setting up training data (multiple manifests supported)")
+    # NeMo supports multiple manifests. We use a more robust setup for TDT.
+    print(f"Setting up training data (multiple manifests: {args.train_manifest})")
+    
+    # TDT requires specific data config to handle its duration-based targets
     model.setup_training_data(train_data_config={
         'manifest_filepath': args.train_manifest,
         'sample_rate': 16000,
@@ -84,7 +86,10 @@ def main(args):
         'shuffle': True,
         'num_workers': args.num_workers,
         'pin_memory': True,
-        'use_start_end_at_placeholder': True, # Important for TDT
+        'trim_silence': False,
+        'max_duration': 20.0,  # Avoid memory spikes on 5090
+        'min_duration': 0.1,
+        'use_start_end_at_placeholder': True,
     })
 
     # 4. Setup validation data
