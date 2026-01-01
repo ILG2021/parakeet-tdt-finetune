@@ -59,7 +59,7 @@ def create_manifest_ljspeech(metadata_path, wav_dir, manifest_path, lang):
         
     with open(manifest_path, 'w', encoding='utf-8') as f:
         for entry in manifest:
-            f.write(json.dumps(entry) + '\n')
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
             
     print(f"\nManifest created at {manifest_path} with {len(manifest)} entries.")
 
@@ -96,6 +96,6 @@ if __name__ == "__main__":
                 break
     
     if not wav_dir:
-        wav_dir = args.data_folder # Fallback to root
+        wav_dir = os.path.join(args.data_folder, "wavs") # Fallback to root
 
     create_manifest_ljspeech(metadata_path, wav_dir, args.output_manifest, args.lang)

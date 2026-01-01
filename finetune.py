@@ -1,10 +1,11 @@
 import torch
 import lightning.pytorch as pl
 import nemo.collections.asr as nemo_asr
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf, DictConfig, open_dict
 import argparse
 import os
 import json
+
 
 def extract_char_list(manifest_paths):
     """Extract all unique characters from the manifest files to build a Chinese vocabulary."""
@@ -22,13 +23,14 @@ def extract_char_list(manifest_paths):
     print(f"Total unique characters found: {len(char_list)}")
     return char_list
 
+
 def train_char_tokenizer(manifest_paths, output_dir):
     """Trains a character-level SentencePiece tokenizer on the fly."""
     import sentencepiece as spm
     print(f"Training character-level tokenizer in {output_dir}...")
     os.makedirs(output_dir, exist_ok=True)
     text_path = os.path.join(output_dir, 'corpus.txt')
-    
+
     # Collect all text for training
     chars = set()
     with open(text_path, 'w', encoding='utf-8') as f_out:
@@ -38,22 +40,23 @@ def train_char_tokenizer(manifest_paths, output_dir):
                     text = json.loads(line)['text']
                     f_out.write(text + '\n')
                     chars.update(list(text))
-    
+
     vocab_size = len(chars) + 32  # Add buffer for control tokens (<unk>, <s>, </s>, etc.)
-    
+
     spm.SentencePieceTrainer.train(
         input=text_path,
-        model_prefix=os.path.join(output_dir, 'spm'), # Temporary prefix
+        model_prefix=os.path.join(output_dir, 'spm'),  # Temporary prefix
         vocab_size=vocab_size,
         model_type='char',
         character_coverage=1.0,
     )
-    
+
     # NeMo expects specifically named files in the directory: 'tokenizer.model' and 'vocab.txt'
     os.rename(os.path.join(output_dir, 'spm.model'), os.path.join(output_dir, 'tokenizer.model'))
     os.rename(os.path.join(output_dir, 'spm.vocab'), os.path.join(output_dir, 'vocab.txt'))
-    
+
     print(f"Tokenizer training complete. Files saved in {output_dir}")
+
 
 def main(args):
     # 1. Load the pre-trained Parakeet-TDT-0.6b-v3 model
@@ -63,7 +66,7 @@ def main(args):
 
     # [OPTIMIZATION] Enable Gradient Checkpointing via config (NeMo standard way)
     if hasattr(model, 'cfg') and 'encoder' in model.cfg:
-        with OmegaConf.open_dict(model.cfg):
+        with open_dict(model.cfg):
             model.cfg.encoder.gradient_checkpointing = True
         # Re-apply config if necessary (some models require this to trigger logic)
         if hasattr(model.encoder, 'set_gradient_checkpointing'):
@@ -77,16 +80,16 @@ def main(args):
         model.change_vocabulary(new_tokenizer_dir=args.tokenizer_path, new_tokenizer_type="bpe")
     else:
         print("No tokenizer provided. Generating character-level SP tokenizer from manifests...")
-        # For EncDecRNNTBPEModel, we must provide a tokenizer directory. 
+        # For EncDecRNNTBPEModel, we must provide a tokenizer directory.
         # We train a quick character-level SentencePiece model to act as a char-tokenizer.
         temp_tokenizer_dir = "chinese_tokenizer_chars"
         train_char_tokenizer(args.train_manifest, temp_tokenizer_dir)
         model.change_vocabulary(new_tokenizer_dir=temp_tokenizer_dir, new_tokenizer_type="bpe")
-    
+
     # 3. Setup training data
     # NeMo supports multiple manifests. We use a more robust setup for TDT.
     print(f"Setting up training data (multiple manifests: {args.train_manifest})")
-    
+
     # TDT requires specific data config to handle its duration-based targets
     model.setup_training_data(train_data_config={
         'manifest_filepath': args.train_manifest,
@@ -133,7 +136,7 @@ def main(args):
     # 6. Initialize Trainer
     # bf16-mixed is highly recommended for Parakeet (Ampere GPUs and later)
     precision = 'bf16-mixed' if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8 else '16-mixed'
-    
+
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         filename='parakeet-tdt-zh-{epoch:02d}-{val_wer:.2f}',
         save_top_k=3,
@@ -144,7 +147,7 @@ def main(args):
 
     trainer = pl.Trainer(
         devices=args.gpus,
-        accelerator='gpu', 
+        accelerator='gpu',
         max_epochs=args.epochs,
         precision=precision,
         accumulate_grad_batches=args.grad_acc,
@@ -162,6 +165,7 @@ def main(args):
     print(f"Saving fine-tuned model to {args.save_path}")
     model.save_to(args.save_path)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fine-tune Parakeet-TDT v3 for Chinese ASR")
     parser.add_argument("--train_manifest", type=str, required=True, help="Manifest paths, comma separated")
@@ -174,6 +178,6 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--gpus", type=int, default=1)
     parser.add_argument("--save_path", type=str, default="parakeet_tdt_zh_5090.nemo")
-    
+
     args = parser.parse_args()
     main(args)

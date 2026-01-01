@@ -5,18 +5,12 @@
 ---
 
 ## 🛠️ 1. 环境准备
-
-针对 **RTX 5090** 等现代 GPU 优化的依赖环境：
+python 3.10
 
 ```bash
-# 安装基础工具及 NeMo (ASR 核心)
-pip install -U nemo_toolkit[asr]>=2.0.0
-pip install pytorch-lightning>=2.0 omegaconf librosa cython soundfile
-
-# 安装 FunASR (用于高质量标点恢复)
-pip install -U git+https://github.com/ILG2021/FunASR.git
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements.txt
 ```
-
 ---
 
 ## 📂 2. 多源数据预处理

@@ -1,7 +1,7 @@
 nemo_toolkit[asr]>=2.0.0
-torch>=2.0
 pytorch-lightning>=2.0
 omegaconf
 librosa
 cython
 git+https://github.com/ILG2021/FunASR.git
+torchcodec
