@@ -43,12 +43,17 @@ def train_char_tokenizer(manifest_paths, output_dir):
     
     spm.SentencePieceTrainer.train(
         input=text_path,
-        model_prefix=os.path.join(output_dir, 'tokenizer'),
+        model_prefix=os.path.join(output_dir, 'spm'), # Temporary prefix
         vocab_size=vocab_size,
         model_type='char',
         character_coverage=1.0,
     )
-    print(f"Tokenizer training complete. Vocab size: {vocab_size}")
+    
+    # NeMo expects specifically named files in the directory: 'tokenizer.model' and 'vocab.txt'
+    os.rename(os.path.join(output_dir, 'spm.model'), os.path.join(output_dir, 'tokenizer.model'))
+    os.rename(os.path.join(output_dir, 'spm.vocab'), os.path.join(output_dir, 'vocab.txt'))
+    
+    print(f"Tokenizer training complete. Files saved in {output_dir}")
 
 def main(args):
     # 1. Load the pre-trained Parakeet-TDT-0.6b-v3 model
