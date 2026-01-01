@@ -71,9 +71,14 @@ def create_manifest_local_audiofolder(data_dir, output_manifest, lang, text_col=
                 y, sr = librosa.load(abs_path, sr=16000, mono=True)
                 duration = librosa.get_duration(y=y, sr=sr)
                 
-                # Create a unique filename for the WAV
-                file_id = os.path.splitext(os.path.basename(rel_path))[0]
-                wav_path = os.path.join(wav_dir, f"{file_id}_{i}.wav")
+                # Replicate directory structure to avoid filename collisions
+                # rel_path might be "subdir/audio.mp3"
+                rel_dir = os.path.dirname(rel_path)
+                target_subdir = os.path.join(wav_dir, rel_dir)
+                os.makedirs(target_subdir, exist_ok=True)
+                
+                file_basename = os.path.splitext(os.path.basename(rel_path))[0]
+                wav_path = os.path.join(target_subdir, f"{file_basename}.wav")
                 
                 # Save as WAV
                 if not os.path.exists(wav_path):
@@ -113,8 +118,9 @@ if __name__ == "__main__":
     parser.add_argument("--metadata_name", type=str, default="metadata.csv",
                         help="Name of the metadata file")
     parser.add_argument("--lang", type=str, default="zh", help="Language code")
-    parser.add_argument("--convert_to_wav", action="store_true", 
-                        help="Convert all audio to 16kHz mono WAV (Highly recommended for MP3/Stereo sources)")
+    parser.add_argument("--skip_convert", action="store_false", dest="convert_to_wav",
+                        help="Skip converting audio to 16kHz mono WAV (Not recommended unless data is already standardized)")
+    parser.set_defaults(convert_to_wav=True)
     
     args = parser.parse_args()
 
