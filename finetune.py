@@ -61,6 +61,12 @@ def main(args):
     # TDT models are sensitive to config, so we load carefully
     model = nemo_asr.models.ASRModel.from_pretrained(model_name="nvidia/parakeet-tdt-0.6b-v3")
 
+    # [OPTIMIZATION] Enable Gradient Checkpointing
+    if hasattr(model, 'encoder') and hasattr(model.encoder, 'set_gradient_checkpointing'):
+        print("Enabling Gradient Checkpointing for Encoder...")
+        model.encoder.set_gradient_checkpointing(True)
+    model.set_gradient_checkpointing(True)
+
     # 2. Chinese Vocabulary Replacement (MANDATORY for English base model)
     print("Preparing for Chinese vocabulary replacement...")
     if args.tokenizer_path and os.path.exists(args.tokenizer_path):
@@ -87,9 +93,12 @@ def main(args):
         'num_workers': args.num_workers,
         'pin_memory': True,
         'trim_silence': False,
-        'max_duration': 20.0,  # Avoid memory spikes on 5090
-        'min_duration': 0.1,
+        'max_duration': 30.0,  # [USER REQUEST] No duration limit
+        'min_duration': 1.0,
         'use_start_end_at_placeholder': True,
+        # [OPTIMIZATION] Bucketing helps managing memory with variant lengths
+        'bucketing_strategy': 'synced_randomized',
+        'bucketing_batch_size': args.batch_size,
     })
 
     # 4. Setup validation data
@@ -155,9 +164,9 @@ if __name__ == "__main__":
     parser.add_argument("--train_manifest", type=str, required=True, help="Manifest paths, comma separated")
     parser.add_argument("--val_manifest", type=str, default=None)
     parser.add_argument("--tokenizer_path", type=str, default=None, help="Path to a pre-trained SP model (optional)")
-    parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU (Optimized for 5090)")
-    parser.add_argument("--grad_acc", type=int, default=4, help="Gradient accumulation steps")
-    parser.add_argument("--num_workers", type=int, default=12, help="Dataloader num_workers")
+    parser.add_argument("--batch_size", type=int, default=4, help="Batch size per GPU")
+    parser.add_argument("--grad_acc", type=int, default=16, help="Gradient accumulation steps")
+    parser.add_argument("--num_workers", type=int, default=8, help="Dataloader num_workers")
     parser.add_argument("--lr", type=float, default=7.5e-5, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--gpus", type=int, default=1)
