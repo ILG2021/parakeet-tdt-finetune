@@ -1,5 +1,5 @@
 import torch
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import nemo.collections.asr as nemo_asr
 from omegaconf import OmegaConf, DictConfig
 import argparse
