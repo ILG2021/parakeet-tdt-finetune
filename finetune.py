@@ -61,11 +61,14 @@ def main(args):
     # TDT models are sensitive to config, so we load carefully
     model = nemo_asr.models.ASRModel.from_pretrained(model_name="nvidia/parakeet-tdt-0.6b-v3")
 
-    # [OPTIMIZATION] Enable Gradient Checkpointing
-    if hasattr(model, 'encoder') and hasattr(model.encoder, 'set_gradient_checkpointing'):
-        print("Enabling Gradient Checkpointing for Encoder...")
-        model.encoder.set_gradient_checkpointing(True)
-    model.set_gradient_checkpointing(True)
+    # [OPTIMIZATION] Enable Gradient Checkpointing via config (NeMo standard way)
+    if hasattr(model, 'cfg') and 'encoder' in model.cfg:
+        with OmegaConf.open_dict(model.cfg):
+            model.cfg.encoder.gradient_checkpointing = True
+        # Re-apply config if necessary (some models require this to trigger logic)
+        if hasattr(model.encoder, 'set_gradient_checkpointing'):
+            model.encoder.set_gradient_checkpointing(True)
+        print("Gradient Checkpointing enabled in model config.")
 
     # 2. Chinese Vocabulary Replacement (MANDATORY for English base model)
     print("Preparing for Chinese vocabulary replacement...")
