@@ -1,7 +1,7 @@
 import torch
 import lightning.pytorch as pl
 import nemo.collections.asr as nemo_asr
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf, DictConfig, open_dict
 import argparse
 import os
 import json
@@ -63,7 +63,7 @@ def main(args):
 
     # [OPTIMIZATION] Enable Gradient Checkpointing via config (NeMo standard way)
     if hasattr(model, 'cfg') and 'encoder' in model.cfg:
-        with OmegaConf.open_dict(model.cfg):
+        with open_dict(model.cfg):
             model.cfg.encoder.gradient_checkpointing = True
         # Re-apply config if necessary (some models require this to trigger logic)
         if hasattr(model.encoder, 'set_gradient_checkpointing'):
